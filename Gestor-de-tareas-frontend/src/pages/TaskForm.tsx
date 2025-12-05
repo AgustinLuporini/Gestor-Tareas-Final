@@ -9,6 +9,7 @@ import { getFullName, type User } from '../types/user';
 import { CommentSection } from '../components/CommentSection';
 import { HistorySection } from '../components/HistorySection';
 import { TagSection } from '../components/TagSection';
+import { DependencySection } from '../components/DependencySection';
 
 // Supuesto: Tipo de dato de equipo
 interface Team {
@@ -358,13 +359,16 @@ export function TaskForm() {
       </form>
 
       {/* --- SECCIONES DE DETALLE --- */}
-      {isEditMode && taskData && (
-        <>
-          <TagSection task={taskData} />
-          <CommentSection taskId={taskIdAsNumber} />
-          <HistorySection taskId={taskIdAsNumber} />
-        </>
-      )}
+    {isEditMode && taskData && (
+            <>
+            {/* Le pasamos el ID de la tarea y el ID del equipo (importante para filtrar) */}
+            <DependencySection taskId={taskIdAsNumber} teamId={taskData.teamId} />
+            
+            <TagSection task={taskData} />
+            <CommentSection taskId={taskIdAsNumber} />
+            <HistorySection taskId={taskIdAsNumber} />
+            </>
+        )}
     </div>
   );
 }
