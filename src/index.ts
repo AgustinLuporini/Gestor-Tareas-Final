@@ -18,6 +18,7 @@ import membershipRoutes from "./routes/teamMembershipRoutes";
 import statusHistoryRoutes from "./routes/statusHistoryRoutes";
 import tagRoutes from "./routes/tagRoutes";
 import activityRoutes from "./routes/activityRoutes"; 
+import taskDependencyRoutes from "./routes/taskDependencyRoutes";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -42,6 +43,8 @@ app.use("/memberships", membershipRoutes);
 app.use("/history", statusHistoryRoutes);
 app.use("/tags", tagRoutes); 
 app.use("/activity", activityRoutes); // <-- 2. USAR LA NUEVA RUTA
+//app.use("/tasks", taskDependencyRoutes); 
+//app.use("/dependencies", taskDependencyRoutes); // Para /dependencies/:id
 
 // Probar conexión a la base de datos (sigue igual)
 app.get("/test-db", async (req, res) => { /* ... */ });

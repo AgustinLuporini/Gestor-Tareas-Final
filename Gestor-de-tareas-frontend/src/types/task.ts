@@ -1,47 +1,44 @@
 // src/types/task.ts
-import { type User } from './user';
-import { type Team } from './team';
-import { type TaskTag } from './tag'; // <-- 1. IMPORTAR TaskTag
-import { type Comment } from './comment';
-import { type StatusHistory } from './history';
 
-// --- ENUMS (Siguen igual) ---
+import { type User } from './user'; // (Tus imports actuales)
+import { type Team } from './team';
+// ⭐️ IMPORTANTE: Importa el tipo de dependencia
+import { type TaskDependency } from './dependency'; 
+
 export enum TaskStatus {
   PENDING = "pendiente",
   IN_PROGRESS = "en_curso", 
   COMPLETED = "finalizada",
   CANCELLED = "cancelada"
 }
+
 export enum TaskPriority {
   HIGH = "alta",
   MEDIUM = "media",
   LOW = "baja"
 }
 
-// --- INTERFAZ (Actualizada) ---
 export interface Task {
   id: number;
   title: string;
   description?: string;
   status: TaskStatus;
   priority: TaskPriority;
-  dueDate?: string;
+  dueDate?: string; // O Date, según como lo tengas
   createdAt: string;
   updatedAt: string;
   
-  // IDs
+  // Relaciones existentes
   teamId: number;
-  createdById: number;
-  assignedToId?: number;
-
-  // Relaciones populadas (que el backend nos envía)
   team?: Team;
+  createdById: number;
   createdBy?: User;
+  assignedToId?: number | null;
   assignedTo?: User;
-  
-  // --- 2. AÑADIR/ACTUALIZAR ESTAS LÍNEAS ---
-  taskTags?: TaskTag[]; // <-- El backend nos envía esto
-  comments?: Comment[]; // <-- El backend nos envía esto
-  // (El historial lo cargamos por separado)
-  // statusHistory?: StatusHistory[]; 
+
+  // ... otros campos que tengas ...
+
+  // ⭐️ AGREGA ESTAS DOS LÍNEAS AL FINAL:
+  outgoingDependencies?: TaskDependency[];
+  incomingDependencies?: TaskDependency[];
 }

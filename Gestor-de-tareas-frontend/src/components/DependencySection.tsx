@@ -2,8 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { http } from '../utils/http';
 import type { Task } from '../types/task';
 import { DependencyType, type TaskDependency } from '../types/dependency';
-// 1. Importamos el contexto de usuario para obtener el ID de quien crea
-import { useUser } from '../context/UserContext'; 
+import { useUser } from '../context/UserContext';
+
+// Diccionario de etiquetas
+const TYPE_LABELS: Record<string, string> = {
+  DEPENDS_ON: "Depende de",
+  BLOCKED_BY: "Bloqueada por",
+  DUPLICATED_WITH: "Es duplicado de"
+};
 
 interface Props {
   taskId: number;
@@ -11,87 +17,74 @@ interface Props {
 }
 
 export function DependencySection({ taskId, teamId }: Props) {
-  const { currentUser } = useUser(); // Hook para sacar el usuario logueado
+  const { currentUser } = useUser();
   const [dependencies, setDependencies] = useState<TaskDependency[]>([]);
   const [candidateTasks, setCandidateTasks] = useState<Task[]>([]);
   
+  // Estado del formulario
   const [selectedTargetId, setSelectedTargetId] = useState<string>("");
   const [selectedType, setSelectedType] = useState<DependencyType>(DependencyType.BLOCKED_BY);
+  // ⭐️ 1. NUEVO ESTADO PARA LA NOTA
+  const [note, setNote] = useState(""); 
+  
   const [isLoading, setIsLoading] = useState(false);
 
-  // LISTAR: Usamos la ruta /tasks/:taskId/dependencies
+  // Cargar dependencias
   const fetchDependencies = useCallback(async () => {
     try {
-      // ⚠️ CORRECCIÓN DE URL: Coincide con tu controlador static listDependencies
       const res = await http.get<{ data: TaskDependency[] }>(`/tasks/${taskId}/dependencies`);
-      // Tu controlador devuelve { message, data: [...] }, así que accedemos a .data
       setDependencies(res.data);
     } catch (error) {
       console.error("Error cargando dependencias", error);
     }
   }, [taskId]);
 
+  // Cargar candidatos
   useEffect(() => {
-async function fetchCandidates() {
-    if (!teamId) return;
-    try {
-      // CAMBIO 1: Tipar la respuesta para indicar que viene dentro de un objeto 'data'
-      // Asumimos que tu endpoint /tasks devuelve { data: Task[] } o similar
-      // Si tu endpoint /tasks devuelve un array directo, avísame. 
-      // Pero por el error, seguro devuelve un objeto.
-      const res = await http.get<{ data: Task[] }>(`/tasks?teamId=${teamId}`);
-      
-      // CAMBIO 2: Acceder a res.data antes de filtrar
-      if (res.data && Array.isArray(res.data)) {
+    async function fetchCandidates() {
+      if (!teamId) return;
+      try {
+        const res = await http.get<{ data: Task[] }>(`/tasks?teamId=${teamId}`);
+        if (res.data && Array.isArray(res.data)) {
           setCandidateTasks(res.data.filter(t => t.id !== taskId));
-      } else {
-          // Fallback por si la estructura es diferente
-          console.error("Formato inesperado en /tasks:", res);
-          setCandidateTasks([]); 
+        } else {
+           setCandidateTasks([]);
+        }
+      } catch (error) {
+        console.error("Error cargando candidatos", error);
       }
-
-    } catch (error) {
-      console.error("Error cargando candidatos", error);
     }
-  }
-  fetchCandidates();
-  fetchDependencies();
-}, [taskId, teamId, fetchDependencies]);
+    fetchCandidates();
+    fetchDependencies();
+  }, [taskId, teamId, fetchDependencies]);
 
-  // AGREGAR
+  // Agregar dependencia
   const handleAddDependency = async () => {
-    if (!selectedTargetId || !currentUser) return; // Validamos que haya usuario
+    if (!selectedTargetId || !currentUser) return;
     setIsLoading(true);
     try {
-      // ⚠️ CORRECCIÓN DE URL Y PAYLOAD
-      // Tu controlador createDependency espera el source en la URL y el resto en el body
       await http.post(`/tasks/${taskId}/dependencies`, {
         targetTaskId: Number(selectedTargetId),
         type: selectedType,
-        note: "Creada desde el frontend", // Tu controlador acepta nota opcional
-        createdById: currentUser.id       // OBLIGATORIO según tu controlador
+        note: note.trim(), // ⭐️ 2. ENVIAMOS LA NOTA (si está vacía no pasa nada)
+        createdById: currentUser.id
       });
       
-      setSelectedTargetId(""); 
-      fetchDependencies(); 
+      // Limpiamos el form
+      setSelectedTargetId("");
+      setNote(""); // ⭐️ Limpiamos la nota también
+      fetchDependencies();
     } catch (error: any) {
-      // Mostramos el mensaje exacto que devuelve tu backend (ej: "Ciclo detectado")
       alert("Error: " + (error.message || "No se pudo crear"));
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ELIMINAR
- const handleDelete = async (depId: number) => {
+  const handleDelete = async (depId: number) => {
     if (!confirm("¿Borrar esta dependencia?")) return;
     try {
-      // ANTES (Estaba mal):
-      // await http.delete(`/dependencies/${depId}`);
-      
-      // AHORA (Correcto, agregando /tasks al principio):
       await http.delete(`/tasks/dependencies/${depId}`);
-      
       fetchDependencies();
     } catch (error) {
       console.error(error);
@@ -109,21 +102,38 @@ async function fetchCandidates() {
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {dependencies.map(dep => {
             const isSource = dep.sourceTaskId === taskId;
-            // OJO: Asegúrate que tu servicio (backend) devuelva las relaciones sourceTask y targetTask pobladas
             const otherTask = isSource ? dep.targetTask : dep.sourceTask;
-            
+            const otherTaskName = otherTask?.title || `Tarea #${isSource ? dep.targetTaskId : dep.sourceTaskId}`;
+
             return (
-              <li key={dep.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid #f0f0f0' }}>
-                <span>
+              <li key={dep.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', borderBottom: '1px solid #f0f0f0' }}>
+                <span style={{ fontSize: '0.95rem' }}>
                   {isSource ? (
-                    <>Esta tarea <strong>{dep.type}</strong> a: {otherTask?.title || `#${dep.targetTaskId}`}</>
+                    <><strong>{TYPE_LABELS[dep.type] || dep.type}:</strong> {otherTaskName}</>
                   ) : (
-                    <>Esta tarea es <strong>{dep.type}</strong> por: {otherTask?.title || `#${dep.sourceTaskId}`}</>
+                    <>
+                      {dep.type === 'BLOCKED_BY' ? (
+                        <><strong>Me bloquea:</strong> {otherTaskName}</>
+                      ) : dep.type === 'DEPENDS_ON' ? (
+                        <><strong>Es requisito para:</strong> {otherTaskName}</>
+                      ) : (
+                        <><strong>{dep.type} con:</strong> {otherTaskName}</>
+                      )}
+                    </>
+                  )}
+                  
+                  {/* ⭐️ 3. MOSTRAMOS LA NOTA SI EXISTE */}
+                  {dep.note && (
+                    <span style={{ display: 'block', fontSize: '0.85rem', color: '#555', marginTop: '0.25rem', fontStyle: 'italic', backgroundColor: '#fdfdfd', padding: '2px 6px', borderRadius: '4px', borderLeft: '3px solid #ddd' }}>
+                      📝 {dep.note}
+                    </span>
                   )}
                 </span>
+
                 <button 
                   onClick={() => handleDelete(dep.id)}
-                  style={{ color: 'red', border: 'none', background: 'none', cursor: 'pointer' }}
+                  title="Eliminar relación"
+                  style={{ color: '#EF4444', border: '1px solid #FEE2E2', backgroundColor: '#FEF2F2', borderRadius: '4px', padding: '0.25rem 0.5rem', cursor: 'pointer', marginLeft: '1rem' }}
                 >
                   🗑️
                 </button>
@@ -133,15 +143,17 @@ async function fetchCandidates() {
         </ul>
       )}
 
-      {/* FORMULARIO */}
+      {/* FORMULARIO DE AGREGAR */}
       <div style={{ marginTop: '1rem', backgroundColor: '#f9fafb', padding: '1rem', borderRadius: '6px' }}>
         <h4 style={{ margin: '0 0 0.5rem' }}>Agregar relación</h4>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        
+        {/* Contenedor Flex para que se vea ordenado */}
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           
           <select 
             value={selectedType} 
             onChange={(e) => setSelectedType(e.target.value as DependencyType)}
-            style={{ padding: '0.5rem' }}
+            style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
           >
             <option value={DependencyType.DEPENDS_ON}>Depende de...</option>
             <option value={DependencyType.BLOCKED_BY}>Es Bloqueada Por...</option>
@@ -151,13 +163,22 @@ async function fetchCandidates() {
           <select 
             value={selectedTargetId} 
             onChange={(e) => setSelectedTargetId(e.target.value)}
-            style={{ padding: '0.5rem', flex: 1 }}
+            style={{ padding: '0.5rem', flex: 1, borderRadius: '4px', border: '1px solid #ccc', minWidth: '200px' }}
           >
             <option value="">-- Seleccionar Tarea --</option>
             {candidateTasks.map(t => (
               <option key={t.id} value={t.id}>#{t.id} - {t.title}</option>
             ))}
           </select>
+
+          {/* ⭐️ 4. CAMPO DE ENTRADA PARA LA NOTA */}
+          <input 
+            type="text" 
+            placeholder="Nota opcional (ej: Esperar a que aprueben presupuesto)"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            style={{ padding: '0.5rem', flex: 2, borderRadius: '4px', border: '1px solid #ccc', minWidth: '200px' }}
+          />
 
           <button 
             onClick={handleAddDependency}

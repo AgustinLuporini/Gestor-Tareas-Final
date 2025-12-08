@@ -6,6 +6,7 @@ import { StatusHistory } from "./StatusHistory";
 import { TaskTag } from "./TaskTag";           
 import { Comment } from "./Comment";         
 import { Activity } from "./Activity";
+import { TaskDependency } from "./TaskDependency";
 
 // Enums para los estados y prioridades
 export enum TaskStatus {
@@ -95,4 +96,12 @@ export class Task {
 
   @OneToMany(() => Activity, (activity) => activity.actor)
   activities!: Activity[];
+
+  // Dependencias que "salen" de esta tarea (Yo dependo de X...)
+  @OneToMany(() => TaskDependency, (dependency) => dependency.sourceTask)
+  outgoingDependencies!: TaskDependency[];
+
+  // Dependencias que "entran" a esta tarea (X depende de mí...)
+  @OneToMany(() => TaskDependency, (dependency) => dependency.targetTask)
+  incomingDependencies!: TaskDependency[];
 }
