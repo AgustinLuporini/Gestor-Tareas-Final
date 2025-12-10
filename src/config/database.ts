@@ -27,7 +27,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || "gestor_tareas",
   ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
   // NOTA: Si las tablas no existen en tu DB todavía, cambia esto a "true" temporalmente
-  synchronize: true, 
+  synchronize: false, 
   logging: false,
   entities: [
     User,

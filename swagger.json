@@ -2,44 +2,223 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Gestor de Tareas API",
-    "description": "API REST para la gestión de tareas, equipos y usuarios.",
+    "description": "Documentación completa de la API REST para el Gestor de Tareas.",
     "version": "1.0.0"
   },
   "servers": [
     {
       "url": "http://localhost:3000",
-      "description": "Servidor de Desarrollo"
+      "description": "Servidor Local"
     }
   ],
+  "components": {
+    "schemas": {
+      "Task": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "title": { "type": "string" },
+          "status": { "type": "string", "enum": ["pendiente", "en_curso", "finalizada", "cancelada"] },
+          "priority": { "type": "string", "enum": ["alta", "media", "baja"] }
+        }
+      }
+    }
+  },
   "paths": {
     "/users": {
       "get": {
         "summary": "Listar todos los usuarios",
         "tags": ["Usuarios"],
         "responses": {
-          "200": {
-            "description": "Una lista de usuarios"
-          }
+          "200": { "description": "Lista de usuarios obtenida" }
         }
       },
       "post": {
-        "summary": "Crear un nuevo usuario",
+        "summary": "Crear un usuario",
         "tags": ["Usuarios"],
-        "responses": {
-          "201": {
-            "description": "Usuario creado"
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "firstName": { "type": "string" },
+                  "lastName": { "type": "string" },
+                  "email": { "type": "string" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
           }
+        },
+        "responses": {
+          "201": { "description": "Usuario creado" }
+        }
+      }
+    },
+    "/teams": {
+      "get": {
+        "summary": "Listar todos los equipos",
+        "tags": ["Equipos"],
+        "responses": {
+          "200": { "description": "Lista de equipos obtenida" }
+        }
+      },
+      "post": {
+        "summary": "Crear un equipo",
+        "tags": ["Equipos"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "ownerId": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Equipo creado" }
         }
       }
     },
     "/tasks": {
       "get": {
-        "summary": "Listar todas las tareas",
+        "summary": "Listar tareas (Filtros + Paginación)",
         "tags": ["Tareas"],
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 }, "description": "Página actual" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 }, "description": "Items por página" },
+          { "name": "status", "in": "query", "schema": { "type": "string" }, "description": "Filtro por estado" },
+          { "name": "priority", "in": "query", "schema": { "type": "string" }, "description": "Filtro por prioridad" },
+          { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Buscar en título" }
+        ],
         "responses": {
-          "200": {
-            "description": "Una lista de tareas"
+          "200": { "description": "Listado paginado de tareas" }
+        }
+      },
+      "post": {
+        "summary": "Crear nueva tarea",
+        "tags": ["Tareas"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "description": { "type": "string" },
+                  "teamId": { "type": "integer" },
+                  "createdById": { "type": "integer" }
+                }
+              }
+            }
           }
+        },
+        "responses": {
+          "201": { "description": "Tarea creada" }
+        }
+      }
+    },
+    "/tasks/{id}": {
+      "get": {
+        "summary": "Obtener una tarea por ID",
+        "tags": ["Tareas"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Detalle de la tarea", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Task" } } } },
+          "404": { "description": "Tarea no encontrada" }
+        }
+      },
+      "patch": {
+        "summary": "Actualizar tarea (Parcial)",
+        "tags": ["Tareas"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": { "type": "string" },
+                  "title": { "type": "string" },
+                  "changedById": { "type": "integer", "description": "ID del usuario que hace el cambio" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Tarea actualizada" }
+        }
+      },
+      "delete": {
+        "summary": "Eliminar tarea",
+        "tags": ["Tareas"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "204": { "description": "Tarea eliminada correctamente" }
+        }
+      }
+    },
+    "/tasks/{taskId}/dependencies": {
+      "get": {
+        "summary": "Listar dependencias de una tarea",
+        "tags": ["Dependencias"],
+        "parameters": [
+          { "name": "taskId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Lista de dependencias" }
+        }
+      },
+      "post": {
+        "summary": "Crear dependencia",
+        "tags": ["Dependencias"],
+        "parameters": [
+          { "name": "taskId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "targetTaskId": { "type": "integer" },
+                  "type": { "type": "string", "enum": ["BLOCKED_BY", "DEPENDS_ON", "DUPLICATED_WITH"] },
+                  "createdById": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Relación creada" }
+        }
+      }
+    },
+    "/tasks/dependencies/{id}": {
+      "delete": {
+        "summary": "Borrar una dependencia",
+        "tags": ["Dependencias"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "204": { "description": "Dependencia eliminada" }
         }
       }
     }

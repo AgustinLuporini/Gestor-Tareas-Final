@@ -1,6 +1,6 @@
-// src/database/seeds/run-seeds.ts
 import "reflect-metadata";
-import { AppDataSource } from "../../config/database";
+// Ajusta esta ruta si tu archivo se llama data-source.ts en lugar de database.ts
+import { AppDataSource } from "../../config/database"; 
 import { User } from "../../entities/User";
 import { Team } from "../../entities/Team";
 import { TeamMembership, MemberRole } from "../../entities/TeamMembership";
@@ -10,6 +10,8 @@ import { Tag } from "../../entities/Tag";
 import { TaskTag } from "../../entities/TaskTag";
 import { StatusHistory } from "../../entities/StatusHistory";
 import { Activity } from "../../entities/Activity";
+// ⭐️ IMPORT NUEVO
+import { TaskDependency, DependencyType } from "../../entities/TaskDependency";
 
 // --- Helpers de Fechas ---
 const daysFromNow = (days: number) => new Date(Date.now() + days * 24 * 60 * 60 * 1000);
@@ -17,19 +19,29 @@ const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 10
 
 async function runSeeds() {
   try {
-    await AppDataSource.initialize();
+    if (!AppDataSource.isInitialized) {
+        await AppDataSource.initialize();
+    }
     console.log("✅ Conectado a la base de datos para ejecutar seeds...");
+
+    console.log("🧹 Limpiando base de datos antigua...");
+    await AppDataSource.dropDatabase(); // Borra todos los datos y tablas
+    await AppDataSource.synchronize();  // Crea las tablas de cero basándose en tus Entidades
+    console.log("✨ Base de datos renovada.");
 
     // -------------------------
     // 1️⃣ Usuarios
     // -------------------------
     const userRepository = AppDataSource.getRepository(User);
+    // Verificar si ya existen para no duplicar si corres el seed dos veces (opcional)
+    // Aquí asumimos base limpia o que TypeORM tiene synchronize: true (dropSchema)
+    
     const users = await userRepository.save(userRepository.create([
-      { firstName: "Agustín", lastName: "Giménez", email: "agus@gestor.com", password: "123456" },
-      { firstName: "Camila", lastName: "López", email: "camila@gestor.com", password: "123456" },
-      { firstName: "Mateo", lastName: "Fontaine", email: "mateo@gestor.com", password: "123456" },
-      { firstName: "Lucía", lastName: "Paez", email: "lucia@gestor.com", password: "123456" },
-      { firstName: "Martín", lastName: "Soria", email: "martin@gestor.com", password: "123456" },
+      { firstName: "Agustín", lastName: "Giménez", email: "agus@gestor.com", password: "123" }, // Pass simple para dev
+      { firstName: "Camila", lastName: "López", email: "camila@gestor.com", password: "123" },
+      { firstName: "Mateo", lastName: "Fontaine", email: "mateo@gestor.com", password: "123" },
+      { firstName: "Lucía", lastName: "Paez", email: "lucia@gestor.com", password: "123" },
+      { firstName: "Martín", lastName: "Soria", email: "martin@gestor.com", password: "123" },
     ]));
     console.log(`👤 ${users.length} Usuarios creados`);
 
@@ -100,49 +112,49 @@ async function runSeeds() {
     const taskRepository = AppDataSource.getRepository(Task);
     const tasks = await taskRepository.save(taskRepository.create([
       // --- Tareas 1-8 ---
-      { // Tarea 1
+      { // Tarea 1 (Login)
         title: "Implementar login con Google (OAuth2)",
         description: "Agregar autenticación OAuth2 con Google usando la librería de Supabase.",
         status: TaskStatus.IN_PROGRESS, priority: TaskPriority.HIGH, dueDate: daysFromNow(5),
         team: teams[0], createdBy: users[0], assignedTo: users[1],
       },
-      { // Tarea 2
+      { // Tarea 2 (Logo)
         title: "Diseñar logo del proyecto (v2)",
         description: "Propuesta de diseño con Figma, basarse en la paleta de colores nueva.",
         status: TaskStatus.IN_PROGRESS, priority: TaskPriority.MEDIUM, dueDate: daysFromNow(7),
         team: teams[1], createdBy: users[1], assignedTo: users[2],
       },
-      { // Tarea 3
+      { // Tarea 3 (Bug Paginación)
         title: "Corregir bug en paginación de Tareas",
         description: "El contador total de la paginación no se actualiza al aplicar filtros.",
         status: TaskStatus.PENDING, priority: TaskPriority.HIGH,
         team: teams[0], createdBy: users[1], assignedTo: users[4],
       },
-      { // Tarea 4
+      { // Tarea 4 (TypeORM)
         title: "Actualizar dependencias de TypeORM a v0.3.20",
         description: "Revisar breaking changes y actualizar la entidad de conexión.",
         status: TaskStatus.COMPLETED, priority: TaskPriority.LOW, dueDate: daysAgo(2),
         team: teams[0], createdBy: users[0], assignedTo: users[0],
       },
-      { // Tarea 5
+      { // Tarea 5 (Campaña Email)
         title: "Preparar campaña de email marketing para lanzamiento",
         description: "Definir 3 correos: Expectativa, Lanzamiento y Recordatorio.",
         status: TaskStatus.PENDING, priority: TaskPriority.HIGH, dueDate: daysFromNow(10),
         team: teams[1], createdBy: users[1], assignedTo: users[3],
       },
-      { // Tarea 6
+      { // Tarea 6 (FAQ)
         title: "Redactar guías de usuario (FAQ)",
         description: "Crear la sección de preguntas frecuentes en la web de ayuda.",
         status: TaskStatus.PENDING, priority: TaskPriority.MEDIUM,
         team: teams[2], createdBy: users[0], assignedTo: users[2],
       },
-      { // Tarea 7
+      { // Tarea 7 (Refactorizar - Cancelada)
         title: "Refactorizar servicio de Tareas (Cancelada)",
         description: "Mover lógica de negocio del controlador al servicio. (Se pospone para v2)",
         status: TaskStatus.CANCELLED, priority: TaskPriority.LOW, dueDate: daysAgo(5),
         team: teams[0], createdBy: users[0], assignedTo: users[4],
       },
-      { // Tarea 8
+      { // Tarea 8 (Colores)
         title: "Definir paleta de colores oficial",
         description: "Seleccionar 3 colores primarios y 2 secundarios.",
         status: TaskStatus.COMPLETED, priority: TaskPriority.MEDIUM, dueDate: daysAgo(3),
@@ -180,7 +192,7 @@ async function runSeeds() {
         status: TaskStatus.PENDING, priority: TaskPriority.HIGH, dueDate: daysFromNow(3),
         team: teams[1], createdBy: users[1], assignedTo: users[3],
       },
-      { // Tarea 14
+      { // Tarea 14 (CI/CD)
         title: "Configurar CI/CD pipeline para el frontend",
         description: "Usar GitHub Actions para build y deploy automático a Vercel.",
         status: TaskStatus.PENDING, priority: TaskPriority.MEDIUM,
@@ -349,20 +361,17 @@ async function runSeeds() {
     console.log(`📜 ${statusHistory.length} Registros de Historial de estados creados`);
 
     // -------------------------
-    // 9️⃣ Actividad (Una muestra)
+    // 9️⃣ Actividad
     // -------------------------
     const activityRepository = AppDataSource.getRepository(Activity);
     const activity = await activityRepository.save(activityRepository.create([
-      // Tareas 1-8
       { type: "TASK_CREATED", description: `Tarea "${tasks[0].title}" creada por ${users[0].firstName}`, actor: users[0], team: teams[0], task: tasks[0] },
       { type: "TASK_CREATED", description: `Tarea "${tasks[4].title}" creada por ${users[1].firstName}`, actor: users[1], team: teams[1], task: tasks[4] },
       { type: "COMMENT_ADDED", description: `${users[1].firstName} comentó en "${tasks[0].title}"`, actor: users[1], team: teams[0], task: tasks[0] },
       { type: "COMMENT_ADDED", description: `${users[0].firstName} comentó en "${tasks[0].title}"`, actor: users[0], team: teams[0], task: tasks[0] },
       { type: "STATUS_CHANGED", description: `${users[0].firstName} cambió el estado de "${tasks[3].title}" a ${TaskStatus.COMPLETED}`, actor: users[0], team: teams[0], task: tasks[3] },
-      // Tareas 9-12
       { type: "STATUS_CHANGED", description: `${users[4].firstName} cambió el estado de "${tasks[8].title}" a ${TaskStatus.IN_PROGRESS}`, actor: users[4], team: teams[0], task: tasks[8] },
       { type: "COMMENT_ADDED", description: `${users[1].firstName} comentó en "${tasks[9].title}"`, actor: users[1], team: teams[0], task: tasks[9] },
-      // Tareas 13-25
       { type: "TASK_CREATED", description: `Tarea "${tasks[16].title}" creada por ${users[1].firstName}`, actor: users[1], team: teams[0], task: tasks[16] },
       { type: "STATUS_CHANGED", description: `${users[1].firstName} cambió el estado de "${tasks[16].title}" a ${TaskStatus.IN_PROGRESS}`, actor: users[1], team: teams[0], task: tasks[16] },
       { type: "COMMENT_ADDED", description: `${users[4].firstName} comentó en "${tasks[16].title}"`, actor: users[4], team: teams[0], task: tasks[16] },
@@ -370,6 +379,29 @@ async function runSeeds() {
       { type: "STATUS_CHANGED", description: `${users[2].firstName} cambió el estado de "${tasks[19].title}" a ${TaskStatus.COMPLETED}`, actor: users[2], team: teams[1], task: tasks[19] },
     ]));
     console.log(`🧾 ${activity.length} Registros de Actividad creados`);
+
+    // -------------------------
+    // 🔟 Dependencias (¡NUEVO!)
+    // -------------------------
+    const dependencyRepository = AppDataSource.getRepository(TaskDependency);
+    // tasks[0] = Login
+    // tasks[9] = Testear Flujo
+    // tasks[8] = Endpoint Tags
+    // tasks[5] = FAQ
+    // tasks[23] = Bug Firefox
+    // tasks[2] = Bug Paginación
+    const dependencies = await dependencyRepository.save(dependencyRepository.create([
+        // 1. Bloqueo: La tarea de "Testear Flujo" (9) depende de que se termine "Login" (0)
+        // Login BLOCKS Testear
+        { sourceTask: tasks[0], targetTask: tasks[9], type: DependencyType.BLOCKED_BY, note: "Sin login no se puede testear la creación de equipo" },
+
+        // 2. Dependencia: "FAQ" (5) DEPENDE DE "Manual Usuario" (14)
+        { sourceTask: tasks[5], targetTask: tasks[14], type: DependencyType.DEPENDS_ON, note: "Necesitamos el manual base" },
+
+        // 3. Duplicado: "Bug Firefox" (23) es DUPLICADO DE "Bug Paginación" (2) (Ejemplo hipotético)
+        { sourceTask: tasks[23], targetTask: tasks[2], type: DependencyType.DUPLICATED_WITH, note: "Parece ser el mismo error de JS" }
+    ]));
+    console.log(`🔗 ${dependencies.length} Dependencias entre tareas creadas`);
 
     console.log("🌱 SEED COMPLETO ✅");
     process.exit(0);
