@@ -11,11 +11,6 @@ import { getFullName } from '../types/user';
 import { useDebounce } from '@uidotdev/usehooks';
 import { useUser } from '../context/UserContext';
 
-// Supuesto: Tipo de dato de equipo
-interface Team {
-  id: number;
-  name: string;
-}
 
 // TIPO DE RESPUESTA PAGINADA
 interface PaginatedTasks {
