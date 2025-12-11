@@ -153,6 +153,7 @@ export class TaskService {
   }
 
   // --- 5. MÉTODO updateTask ---
+// --- 5. MÉTODO updateTask ---
   async updateTask(id: number, updates: Partial<Task>, changedById: number): Promise<Task> {
     const task = await this.taskRepository.findOneBy({ id });
 
@@ -175,33 +176,65 @@ export class TaskService {
             throw new Error(`Transición de estado inválida: de ${task.status} a ${updates.status}`);
         }
         
+        // 🔥🔥 VALIDACIÓN DE DEPENDENCIAS (BLOCKED_BY y DEPENDS_ON) 🔥🔥
         if (updates.status === TaskStatus.COMPLETED) {
-             await this.taskDependencyService.validateTaskCompletion(id);
+             const dependencyRepo = AppDataSource.getRepository(TaskDependency);
+             
+             // Buscamos todas las dependencias donde YO SOY EL ORIGEN (Source)
+             // Es decir: "Yo estoy bloqueado por..." o "Yo dependo de..."
+             const myDependencies = await dependencyRepo.find({
+                 where: {
+                     sourceTaskId: id,
+                     type: In([DependencyType.BLOCKED_BY, DependencyType.DEPENDS_ON]) // <--- Abarcamos ambos casos
+                 },
+                 relations: ["targetTask"] // Traemos a la tarea "padre"
+             });
+
+             // Filtramos: ¿Alguna de esas tareas padres NO está terminada?
+             const pendingDependencies = myDependencies.filter(dep => {
+                 const parentTask = dep.targetTask;
+                 // Si la tarea padre existe Y no está completada ni cancelada... entonces me frena.
+                 return parentTask && 
+                        parentTask.status !== TaskStatus.COMPLETED && 
+                        parentTask.status !== TaskStatus.CANCELLED;
+             });
+
+             if (pendingDependencies.length > 0) {
+                 const details = pendingDependencies
+                    .map(d => `${d.type === DependencyType.BLOCKED_BY ? 'Bloqueada por' : 'Depende de'} "${d.targetTask.title}"`)
+                    .join(", ");
+                 
+                 throw new Error(`⛔ No puedes completar esta tarea. Restricciones pendientes: ${details}`);
+             }
         }
     }
     
+    // Aplicar cambios
     Object.assign(task, updates); 
     
     if ((updates as any).assignedToId !== undefined) {
         task.assignedTo = (updates as any).assignedToId ? { id: (updates as any).assignedToId } as User : undefined;
     }
     
-    // REGLA 3: Fechas
+    // Validar fecha (Opcional)
     if (updates.dueDate) {
         const now = new Date();
         const newDate = new Date(updates.dueDate);
         if (newDate < now && task.status !== TaskStatus.COMPLETED) {
-             // Opcional: lanzar error
+             // logica de fecha...
         }
     }
 
     const updatedTask = await this.taskRepository.save(task);
 
-    // ⭐️ SINCRONIZACIÓN DE DUPLICADOS ⭐️
+    // ⭐️ SINCRONIZACIÓN DE DUPLICADOS (DUPLICATED_WITH) ⭐️
+    // Esto pasa DESPUÉS de guardar mi propio estado.
     if (isStatusChanged) {
+        // "Si yo cambié, avísale a mi gemelo"
         await this.syncDuplicateStatus(updatedTask.id, updatedTask.status, changedById);
     }
 
+    // ... (El resto del código de Logs de Actividad sigue igual) ...
     // LOGS DE ACTIVIDAD
     let activityType: ActivityType | null = null;
     let activityDescription: string = "";
